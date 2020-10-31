@@ -130,8 +130,8 @@ public class DefaultLoadBalancingPolicy_Custom extends BasicLoadBalancingPolicy_
 //		LOG.debug("----"+node.getListenAddress().toString());
 //		
 //	}
-		super.init(nodes, distanceReporter);		
-		
+		super.init(nodes, distanceReporter);
+
 		if (avoidSlowReplicas) {
 			((MultiplexingRequestTracker) context.getRequestTracker()).register(this);
 		}
@@ -153,7 +153,7 @@ public class DefaultLoadBalancingPolicy_Custom extends BasicLoadBalancingPolicy_
 
 		// Take a snapshot since the set is concurrent:
 		Object[] currentNodes = liveNodes.toArray();
-		
+
 		Object[] currentNodes_copy = liveNodes.toArray();
 
 //		for (int i = 0; i < currentNodes.length; i++) {
@@ -169,23 +169,21 @@ public class DefaultLoadBalancingPolicy_Custom extends BasicLoadBalancingPolicy_
 
 		int replicaCount = 0; // in currentNodes
 
-		LOG.trace("----------"+allReplicas.isEmpty());
-		
+		LOG.trace("----------" + allReplicas.isEmpty());
+
 		if (!allReplicas.isEmpty()) {
 
 			// Move local replicas to the beginning of the plan
 			for (int i = 0; i < currentNodes.length; i++) {
 				Node node = (Node) currentNodes[i];
-				if (allReplicas.contains(node) && node.getDistance() ==  NodeDistance.LOCAL) {
+				if (allReplicas.contains(node) && node.getDistance() == NodeDistance.LOCAL) {
 					ArrayUtils.bubbleUp(currentNodes, i, replicaCount);
-			
+
 					replicaCount++;
 				}
 			}
-			//add logic to check if qourum can be satisfied , otherwise 
+			// add logic to check if qourum can be satisfied , otherwise
 			LOG.trace("After sorting");
-
-
 
 			if (replicaCount > 1) {
 
@@ -256,30 +254,20 @@ public class DefaultLoadBalancingPolicy_Custom extends BasicLoadBalancingPolicy_
 					}
 				}
 			}
-		}else {
+		} else {
 			for (int i = 0; i < currentNodes.length; i++) {
 				Node node = (Node) currentNodes[i];
-				if (node.getDistance() ==  NodeDistance.LOCAL) {
+				if (node.getDistance() == NodeDistance.LOCAL) {
 					ArrayUtils.bubbleUp(currentNodes, i, replicaCount);
-			
+
 					replicaCount++;
 				}
 			}
-			
-		}
-		
-		
-		
 
-		
-		
-		
-		
-		
-		
+		}
 
 		LOG.trace("[{}] Prioritizing {} local replicas", logPrefix, replicaCount);
-		
+
 //		for (int i = 0; i < currentNodes.length; i++) {
 //
 //			Node node = (Node) currentNodes[i];
@@ -290,7 +278,7 @@ public class DefaultLoadBalancingPolicy_Custom extends BasicLoadBalancingPolicy_
 		// Round-robin the remaining nodes
 		ArrayUtils.rotate(currentNodes, replicaCount, currentNodes.length - replicaCount,
 				roundRobinAmount.getAndUpdate(INCREMENT));
-		
+
 //		for (int i = 0; i < currentNodes.length; i++) {
 //
 //			Node node = (Node) currentNodes[i];
@@ -385,5 +373,4 @@ public class DefaultLoadBalancingPolicy_Custom extends BasicLoadBalancingPolicy_
 		return (pool == null) ? 0 : pool.getInFlight();
 	}
 
-	
 }

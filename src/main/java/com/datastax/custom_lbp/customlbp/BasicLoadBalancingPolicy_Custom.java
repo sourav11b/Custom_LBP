@@ -51,11 +51,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A basic implementation of {@link LoadBalancingPolicy} that can serve as a building block for more
- * advanced use cases.
+ * A basic implementation of {@link LoadBalancingPolicy} that can serve as a
+ * building block for more advanced use cases.
  *
- * <p>To activate this policy, modify the {@code basic.load-balancing-policy} section in the driver
- * configuration, for example:
+ * <p>
+ * To activate this policy, modify the {@code basic.load-balancing-policy}
+ * section in the driver configuration, for example:
  *
  * <pre>
  * datastax-java-driver {
@@ -66,287 +67,301 @@ import org.slf4j.LoggerFactory;
  * }
  * </pre>
  *
- * See {@code reference.conf} (in the manual or core driver JAR) for more details.
+ * See {@code reference.conf} (in the manual or core driver JAR) for more
+ * details.
  *
- * <p><b>Local datacenter</b>: This implementation will only define a local datacenter if it is
- * explicitly set either through configuration or programmatically; if the local datacenter is
- * unspecified, this implementation will effectively act as a datacenter-agnostic load balancing
- * policy and will consider all nodes in the cluster when creating query plans, regardless of their
- * datacenter.
+ * <p>
+ * <b>Local datacenter</b>: This implementation will only define a local
+ * datacenter if it is explicitly set either through configuration or
+ * programmatically; if the local datacenter is unspecified, this implementation
+ * will effectively act as a datacenter-agnostic load balancing policy and will
+ * consider all nodes in the cluster when creating query plans, regardless of
+ * their datacenter.
  *
- * <p><b>Query plan</b>: This implementation prioritizes replica nodes over non-replica ones; if
- * more than one replica is available, the replicas will be shuffled. Non-replica nodes will be
- * included in a round-robin fashion. If the local datacenter is defined (see above), query plans
- * will only include local nodes, never remote ones; if it is unspecified however, query plans may
+ * <p>
+ * <b>Query plan</b>: This implementation prioritizes replica nodes over
+ * non-replica ones; if more than one replica is available, the replicas will be
+ * shuffled. Non-replica nodes will be included in a round-robin fashion. If the
+ * local datacenter is defined (see above), query plans will only include local
+ * nodes, never remote ones; if it is unspecified however, query plans may
  * contain nodes from different datacenters.
  *
- * <p><b>This class is not recommended for normal users who should always prefer {@link
- * DefaultLoadBalancingPolicy}</b>.
+ * <p>
+ * <b>This class is not recommended for normal users who should always prefer
+ * {@link DefaultLoadBalancingPolicy}</b>.
  */
 @ThreadSafe
 public class BasicLoadBalancingPolicy_Custom implements LoadBalancingPolicy {
 
-  private static final Logger LOG = LoggerFactory.getLogger(BasicLoadBalancingPolicy_Custom.class);
+	private static final Logger LOG = LoggerFactory.getLogger(BasicLoadBalancingPolicy_Custom.class);
 
-  protected static final IntUnaryOperator INCREMENT = i -> (i == Integer.MAX_VALUE) ? 0 : i + 1;
+	protected static final IntUnaryOperator INCREMENT = i -> (i == Integer.MAX_VALUE) ? 0 : i + 1;
 
-  @NonNull protected final InternalDriverContext context;
-  @NonNull protected final DriverExecutionProfile profile;
-  @NonNull protected final String logPrefix;
+	@NonNull
+	protected final InternalDriverContext context;
+	@NonNull
+	protected final DriverExecutionProfile profile;
+	@NonNull
+	protected final String logPrefix;
 
-  protected final AtomicInteger roundRobinAmount = new AtomicInteger();
-  protected final CopyOnWriteArraySet<Node> liveNodes = new CopyOnWriteArraySet<>();
+	protected final AtomicInteger roundRobinAmount = new AtomicInteger();
+	protected final CopyOnWriteArraySet<Node> liveNodes = new CopyOnWriteArraySet<>();
 
-  // private because they should be set in init() and never be modified after
-  private volatile DistanceReporter distanceReporter;
-  private volatile Predicate<Node> filter;
-  private volatile String localDc;
+	// private because they should be set in init() and never be modified after
+	private volatile DistanceReporter distanceReporter;
+	private volatile Predicate<Node> filter;
+	private volatile String localDc;
 
-  public BasicLoadBalancingPolicy_Custom(@NonNull DriverContext context, @NonNull String profileName) {
-    this.context = (InternalDriverContext) context;
-    profile = context.getConfig().getProfile(profileName);
-    logPrefix = context.getSessionName() + "|" + profileName;
-  }
+	public BasicLoadBalancingPolicy_Custom(@NonNull DriverContext context, @NonNull String profileName) {
+		this.context = (InternalDriverContext) context;
+		profile = context.getConfig().getProfile(profileName);
+		logPrefix = context.getSessionName() + "|" + profileName;
+	}
 
-  /** @return The local datacenter, if known; empty otherwise. */
-  public Optional<String> getLocalDatacenter() {
-    return Optional.ofNullable(localDc);
-  }
+	/** @return The local datacenter, if known; empty otherwise. */
+	public Optional<String> getLocalDatacenter() {
+		return Optional.ofNullable(localDc);
+	}
 
-  /**
-   * @return An immutable copy of the nodes currently considered as live; if the local datacenter is
-   *     known, this set will contain only nodes belonging to that datacenter.
-   */
-  public Set<Node> getLiveNodes() {
-    return ImmutableSet.copyOf(liveNodes);
-  }
+	/**
+	 * @return An immutable copy of the nodes currently considered as live; if the
+	 *         local datacenter is known, this set will contain only nodes belonging
+	 *         to that datacenter.
+	 */
+	public Set<Node> getLiveNodes() {
+		return ImmutableSet.copyOf(liveNodes);
+	}
 
-  @Override
-  public void init(@NonNull Map<UUID, Node> nodes, @NonNull DistanceReporter distanceReporter) {
-    this.distanceReporter = distanceReporter;
-    localDc = discoverLocalDc(nodes).orElse(null);
-    filter = createNodeFilter(localDc, nodes);
-    for (Node node : nodes.values()) {
-    	LOG.trace(node.getEndPoint().toString());
-      if (filter.test(node)) {
-        distanceReporter.setDistance(node, NodeDistance.LOCAL);
-        if (node.getState() != NodeState.DOWN) {
-          // This includes state == UNKNOWN. If the node turns out to be unreachable, this will be
-          // detected when we try to open a pool to it, it will get marked down and this will be
-          // signaled back to this policy
-          liveNodes.add(node);
-        }
-      } else {
-       // distanceReporter.setDistance(node, NodeDistance.IGNORED);
-        distanceReporter.setDistance(node, NodeDistance.REMOTE);
-  	      if (node.getState() != NodeState.DOWN) {
+	@Override
+	public void init(@NonNull Map<UUID, Node> nodes, @NonNull DistanceReporter distanceReporter) {
+		this.distanceReporter = distanceReporter;
+		localDc = discoverLocalDc(nodes).orElse(null);
+		filter = createNodeFilter(localDc, nodes);
+		for (Node node : nodes.values()) {
+			LOG.trace(node.getEndPoint().toString());
+			if (filter.test(node)) {
+				distanceReporter.setDistance(node, NodeDistance.LOCAL);
+				if (node.getState() != NodeState.DOWN) {
+					// This includes state == UNKNOWN. If the node turns out to be unreachable, this
+					// will be
+					// detected when we try to open a pool to it, it will get marked down and this
+					// will be
+					// signaled back to this policy
+					liveNodes.add(node);
+				}
+			} else {
+				// distanceReporter.setDistance(node, NodeDistance.IGNORED);
+				distanceReporter.setDistance(node, NodeDistance.REMOTE);
+				if (node.getState() != NodeState.DOWN) {
 
-        liveNodes.add(node);
-    	  }
+					liveNodes.add(node);
+				}
 
-      }
-    }
-  }
+			}
+		}
+	}
 
-  /**
-   * Returns the local datacenter, if it can be discovered, or returns {@link Optional#empty empty}
-   * otherwise.
-   *
-   * <p>This method is called only once, during {@linkplain LoadBalancingPolicy#init(Map,
-   * LoadBalancingPolicy.DistanceReporter) initialization}.
-   *
-   * <p>Implementors may choose to throw {@link IllegalStateException} instead of returning {@link
-   * Optional#empty empty}, if they require a local datacenter to be defined in order to operate
-   * properly.
-   *
-   * @param nodes All the nodes that were known to exist in the cluster (regardless of their state)
-   *     when the load balancing policy was initialized. This argument is provided in case
-   *     implementors need to inspect the cluster topology to discover the local datacenter.
-   * @return The local datacenter, or {@link Optional#empty empty} if none found.
-   * @throws IllegalStateException if the local datacenter could not be discovered, and this policy
-   *     cannot operate without it.
-   */
-  @NonNull
-  protected Optional<String> discoverLocalDc(@NonNull Map<UUID, Node> nodes) {
-    return new OptionalLocalDcHelper(context, profile, logPrefix).discoverLocalDc(nodes);
-  }
+	/**
+	 * Returns the local datacenter, if it can be discovered, or returns
+	 * {@link Optional#empty empty} otherwise.
+	 *
+	 * <p>
+	 * This method is called only once, during
+	 * {@linkplain LoadBalancingPolicy#init(Map, LoadBalancingPolicy.DistanceReporter)
+	 * initialization}.
+	 *
+	 * <p>
+	 * Implementors may choose to throw {@link IllegalStateException} instead of
+	 * returning {@link Optional#empty empty}, if they require a local datacenter to
+	 * be defined in order to operate properly.
+	 *
+	 * @param nodes All the nodes that were known to exist in the cluster
+	 *              (regardless of their state) when the load balancing policy was
+	 *              initialized. This argument is provided in case implementors need
+	 *              to inspect the cluster topology to discover the local
+	 *              datacenter.
+	 * @return The local datacenter, or {@link Optional#empty empty} if none found.
+	 * @throws IllegalStateException if the local datacenter could not be
+	 *                               discovered, and this policy cannot operate
+	 *                               without it.
+	 */
+	@NonNull
+	protected Optional<String> discoverLocalDc(@NonNull Map<UUID, Node> nodes) {
+		return new OptionalLocalDcHelper(context, profile, logPrefix).discoverLocalDc(nodes);
+	}
 
-  /**
-   * Creates a new node filter to use with this policy.
-   *
-   * <p>This method is called only once, during {@linkplain LoadBalancingPolicy#init(Map,
-   * LoadBalancingPolicy.DistanceReporter) initialization}, and only after local datacenter
-   * discovery has been attempted.
-   *
-   * @param localDc The local datacenter that was just discovered, or null if none found.
-   * @param nodes All the nodes that were known to exist in the cluster (regardless of their state)
-   *     when the load balancing policy was initialized. This argument is provided in case
-   *     implementors need to inspect the cluster topology to create the node filter.
-   * @return the node filter to use.
-   */
-  @NonNull
-  protected Predicate<Node> createNodeFilter(
-      @Nullable String localDc, @NonNull Map<UUID, Node> nodes) {
-    return new DefaultNodeFilterHelper(context, profile, logPrefix)
-        .createNodeFilter(localDc, nodes);
-  }
+	/**
+	 * Creates a new node filter to use with this policy.
+	 *
+	 * <p>
+	 * This method is called only once, during
+	 * {@linkplain LoadBalancingPolicy#init(Map, LoadBalancingPolicy.DistanceReporter)
+	 * initialization}, and only after local datacenter discovery has been
+	 * attempted.
+	 *
+	 * @param localDc The local datacenter that was just discovered, or null if none
+	 *                found.
+	 * @param nodes   All the nodes that were known to exist in the cluster
+	 *                (regardless of their state) when the load balancing policy was
+	 *                initialized. This argument is provided in case implementors
+	 *                need to inspect the cluster topology to create the node
+	 *                filter.
+	 * @return the node filter to use.
+	 */
+	@NonNull
+	protected Predicate<Node> createNodeFilter(@Nullable String localDc, @NonNull Map<UUID, Node> nodes) {
+		return new DefaultNodeFilterHelper(context, profile, logPrefix).createNodeFilter(localDc, nodes);
+	}
 
-  @NonNull
-  @Override
-  public Queue<Node> newQueryPlan(@Nullable Request request, @Nullable Session session) {
-    // Take a snapshot since the set is concurrent:
-      LOG.trace("super newQueryPlan");
+	@NonNull
+	@Override
+	public Queue<Node> newQueryPlan(@Nullable Request request, @Nullable Session session) {
+		// Take a snapshot since the set is concurrent:
+		LOG.trace("super newQueryPlan");
 
-	  
-    Object[] currentNodes = liveNodes.toArray();
-    
-    
-    
+		Object[] currentNodes = liveNodes.toArray();
 
+		Set<Node> allReplicas = getReplicas(request, session);
+		int replicaCount = 0; // in currentNodes
 
+		if (!allReplicas.isEmpty()) {
+			// Move replicas to the beginning
+			for (int i = 0; i < currentNodes.length; i++) {
+				Node node = (Node) currentNodes[i];
+				if (allReplicas.contains(node)) {
+					ArrayUtils.bubbleUp(currentNodes, i, replicaCount);
+					replicaCount += 1;
+				}
+			}
 
-    Set<Node> allReplicas = getReplicas(request, session);
-    int replicaCount = 0; // in currentNodes
+			if (replicaCount > 1) {
+				shuffleHead(currentNodes, replicaCount);
+			}
+		}
 
-    if (!allReplicas.isEmpty()) {
-      // Move replicas to the beginning
-      for (int i = 0; i < currentNodes.length; i++) {
-        Node node = (Node) currentNodes[i];
-        if (allReplicas.contains(node)) {
-          ArrayUtils.bubbleUp(currentNodes, i, replicaCount);
-          replicaCount += 1;
-        }
-      }
+		LOG.trace("[{}] Prioritizing {} local replicas", logPrefix, replicaCount);
 
-      if (replicaCount > 1) {
-        shuffleHead(currentNodes, replicaCount);
-      }
-    }
+		// Round-robin the remaining nodes
+		ArrayUtils.rotate(currentNodes, replicaCount, currentNodes.length - replicaCount,
+				roundRobinAmount.getAndUpdate(INCREMENT));
 
-    LOG.trace("[{}] Prioritizing {} local replicas", logPrefix, replicaCount);
+		return new QueryPlan(currentNodes);
+	}
 
-    // Round-robin the remaining nodes
-    ArrayUtils.rotate(
-        currentNodes,
-        replicaCount,
-        currentNodes.length - replicaCount,
-        roundRobinAmount.getAndUpdate(INCREMENT));
+	@NonNull
+	protected Set<Node> getReplicas(@Nullable Request request, @Nullable Session session) {
+		if (request == null || session == null) {
 
-    return new QueryPlan(currentNodes);
-  }
+			LOG.trace("request == null || session == null");
+			return Collections.emptySet();
+		}
 
-  @NonNull
-  protected Set<Node> getReplicas(@Nullable Request request, @Nullable Session session) {
-    if (request == null || session == null) {
-    	
-      LOG.trace("request == null || session == null");
-      return Collections.emptySet();
-    }
+		Optional<TokenMap> maybeTokenMap = context.getMetadataManager().getMetadata().getTokenMap();
+		if (!maybeTokenMap.isPresent()) {
+			LOG.trace("!maybeTokenMap.isPresent()");
 
-    Optional<TokenMap> maybeTokenMap = context.getMetadataManager().getMetadata().getTokenMap();
-    if (!maybeTokenMap.isPresent()) {
-        LOG.trace("!maybeTokenMap.isPresent()");
+			return Collections.emptySet();
+		}
 
-      return Collections.emptySet();
-    }
+		// Note: we're on the hot path and the getXxx methods are potentially more than
+		// simple getters,
+		// so we only call each method when strictly necessary (which is why the code
+		// below looks a bit
+		// weird).
+		CqlIdentifier keyspace = null;
+		Token token = null;
+		ByteBuffer key = null;
+		try {
+			keyspace = request.getKeyspace();
+			if (keyspace == null) {
+				keyspace = request.getRoutingKeyspace();
+			}
+			if (keyspace == null && session.getKeyspace().isPresent()) {
+				keyspace = session.getKeyspace().get();
+			}
+			if (keyspace == null) {
 
-    // Note: we're on the hot path and the getXxx methods are potentially more than simple getters,
-    // so we only call each method when strictly necessary (which is why the code below looks a bit
-    // weird).
-    CqlIdentifier keyspace = null;
-    Token token = null;
-    ByteBuffer key = null;
-    try {
-      keyspace = request.getKeyspace();
-      if (keyspace == null) {
-        keyspace = request.getRoutingKeyspace();
-      }
-      if (keyspace == null && session.getKeyspace().isPresent()) {
-        keyspace = session.getKeyspace().get();
-      }
-      if (keyspace == null) {
-    	  
-          LOG.trace("keyspace == null");
+				LOG.trace("keyspace == null");
 
-        return Collections.emptySet();
-      }
+				return Collections.emptySet();
+			}
 
-      token = request.getRoutingToken();
-      key = (token == null) ? request.getRoutingKey() : null;
-      if (token == null && key == null) {
-    	  
-          LOG.trace("token == null && key == null");
+			token = request.getRoutingToken();
+			key = (token == null) ? request.getRoutingKey() : null;
+			if (token == null && key == null) {
 
-        return Collections.emptySet();
-      }
-    } catch (Exception e) {
-      // Protect against poorly-implemented Request instances
-      LOG.error("Unexpected error while trying to compute query plan", e);
-      LOG.trace("Unexpected error while trying to compute query plan");
+				LOG.trace("token == null && key == null");
 
-      return Collections.emptySet();
-    }
+				return Collections.emptySet();
+			}
+		} catch (Exception e) {
+			// Protect against poorly-implemented Request instances
+			LOG.error("Unexpected error while trying to compute query plan", e);
+			LOG.trace("Unexpected error while trying to compute query plan");
 
-    TokenMap tokenMap = maybeTokenMap.get();
-    
-    LOG.trace("tokenMap");
+			return Collections.emptySet();
+		}
 
-    return token != null
-        ? tokenMap.getReplicas(keyspace, token)
-        : tokenMap.getReplicas(keyspace, key);
-  }
+		TokenMap tokenMap = maybeTokenMap.get();
 
-  /** Exposed as a protected method so that it can be accessed by tests */
-  protected void shuffleHead(Object[] currentNodes, int replicaCount) {
-    ArrayUtils.shuffleHead(currentNodes, replicaCount);
-  }
+		LOG.trace("tokenMap");
 
-  @Override
-  public void onAdd(@NonNull Node node) {
-    if (filter.test(node)) {
-      LOG.debug("[{}] {} was added, setting distance to LOCAL", logPrefix, node);
-      // Setting to a non-ignored distance triggers the session to open a pool, which will in turn
-      // set the node UP when the first channel gets opened.
-      distanceReporter.setDistance(node, NodeDistance.LOCAL);
-    } else {
-        LOG.debug("[{}] {} was added, setting distance to REMOTE", logPrefix, node);
+		return token != null ? tokenMap.getReplicas(keyspace, token) : tokenMap.getReplicas(keyspace, key);
+	}
 
-      distanceReporter.setDistance(node, NodeDistance.REMOTE);
-    }
-  }
+	/** Exposed as a protected method so that it can be accessed by tests */
+	protected void shuffleHead(Object[] currentNodes, int replicaCount) {
+		ArrayUtils.shuffleHead(currentNodes, replicaCount);
+	}
 
-  @Override
-  public void onUp(@NonNull Node node) {
-    if (filter.test(node)) {
-      // Normally this is already the case, but the filter could be dynamic and have ignored the
-      // node previously.
-      distanceReporter.setDistance(node, NodeDistance.LOCAL);
-      if (liveNodes.add(node)) {
-        LOG.debug("[{}] {} came back UP, added to live set", logPrefix, node);
-      }
-    } else {
-        LOG.debug("[{}] {} came back UP, added to live set", logPrefix, node);
+	@Override
+	public void onAdd(@NonNull Node node) {
+		if (filter.test(node)) {
+			LOG.debug("[{}] {} was added, setting distance to LOCAL", logPrefix, node);
+			// Setting to a non-ignored distance triggers the session to open a pool, which
+			// will in turn
+			// set the node UP when the first channel gets opened.
+			distanceReporter.setDistance(node, NodeDistance.LOCAL);
+		} else {
+			LOG.debug("[{}] {} was added, setting distance to REMOTE", logPrefix, node);
 
-      distanceReporter.setDistance(node, NodeDistance.REMOTE);
-    }
-  }
+			distanceReporter.setDistance(node, NodeDistance.REMOTE);
+		}
+	}
 
-  @Override
-  public void onDown(@NonNull Node node) {
-    if (liveNodes.remove(node)) {
-      LOG.debug("[{}] {} went DOWN, removed from live set", logPrefix, node);
-    }
-  }
+	@Override
+	public void onUp(@NonNull Node node) {
+		if (filter.test(node)) {
+			// Normally this is already the case, but the filter could be dynamic and have
+			// ignored the
+			// node previously.
+			distanceReporter.setDistance(node, NodeDistance.LOCAL);
+			if (liveNodes.add(node)) {
+				LOG.debug("[{}] {} came back UP, added to live set", logPrefix, node);
+			}
+		} else {
+			LOG.debug("[{}] {} came back UP, added to live set", logPrefix, node);
 
-  @Override
-  public void onRemove(@NonNull Node node) {
-    if (liveNodes.remove(node)) {
-      LOG.debug("[{}] {} was removed, removed from live set", logPrefix, node);
-    }
-  }
+			distanceReporter.setDistance(node, NodeDistance.REMOTE);
+		}
+	}
 
-  @Override
-  public void close() {
-    // nothing to do
-  }
+	@Override
+	public void onDown(@NonNull Node node) {
+		if (liveNodes.remove(node)) {
+			LOG.debug("[{}] {} went DOWN, removed from live set", logPrefix, node);
+		}
+	}
+
+	@Override
+	public void onRemove(@NonNull Node node) {
+		if (liveNodes.remove(node)) {
+			LOG.debug("[{}] {} was removed, removed from live set", logPrefix, node);
+		}
+	}
+
+	@Override
+	public void close() {
+		// nothing to do
+	}
 }

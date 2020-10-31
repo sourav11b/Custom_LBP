@@ -25,18 +25,17 @@ public class test {
 			PreparedStatement prepared = session.prepare("select * from cycling.cyclist_semi_pro  where id = ?");
 			while (true) {
 				try {
-					BoundStatement bound = prepared.bind(new Random().nextInt(10));
+					BoundStatement bound = prepared.bind(new Random().nextInt(20));
 
 					ResultSet rs = session.execute(bound);
 
-					while (rs.getAvailableWithoutFetching() > 0) {
-						Row row = rs.one();
-						System.out.println(row);
+					for (Row row : rs) {
+						System.out.println(" found row : " + row.getInt("id"));
 					}
-
-					System.out
-							.println(" coordinator node : " + rs.getExecutionInfo().getCoordinator().getBroadcastAddress().get().getHostName());
-					System.out.println(" coordinator node DC : " + rs.getExecutionInfo().getCoordinator().getDatacenter());
+					System.out.println(" coordinator node : "
+							+ rs.getExecutionInfo().getCoordinator().getBroadcastAddress().get().getHostName());
+					System.out.println(
+							" coordinator node DC : " + rs.getExecutionInfo().getCoordinator().getDatacenter());
 
 					System.out.println("------------------------------------------------------------");
 
