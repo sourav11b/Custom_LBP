@@ -11,7 +11,7 @@ run the `/fiserv-Custom-LBP-DCFailover/src/main/resources/cyclist_semi_pro.cql` 
 
 please make sure to retain the replciation factor of three.
 
-## configration
+## configuration
 
 change the `/fiserv-Custom-LBP-DCFailover/src/main/resources/application.conf` file as needed - 
 
