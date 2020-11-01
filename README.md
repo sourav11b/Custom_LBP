@@ -50,4 +50,4 @@ the code, once the driver has realised that the local datacenter is ip , will st
 
      found row : <some value>
      coordinator node : <ip>
-     coordinator node DC : DC2
+     coordinator node DC : DC1
