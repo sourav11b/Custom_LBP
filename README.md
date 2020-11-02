@@ -7,9 +7,9 @@ this is an example Java repo on demonstatring how to use a custom load balancer 
 
 create a cassandra cluster with two datacenters having **three nodes each** . 
 
-run the `/fiserv-Custom-LBP-DCFailover/src/main/resources/cyclist_semi_pro.cql` file to generate your schema and load some smaple data. please change the datacenters names in the replication factor creation command to what your cassandra setup has.
+run the contents of `/fiserv-Custom-LBP-DCFailover/src/main/resources/cyclist_semi_pro.cql`  file, from Datastax Studio or cqlsh console, to generate your schema and load some smaple data. please change the datacenters names in the replication factor creation command to match your cassandra setup.
 
-please make sure to retain the replciation factor of three.
+please make sure to retain the replication factor of three.
 
 ## configuration
 
@@ -27,26 +27,26 @@ change the `/fiserv-Custom-LBP-DCFailover/src/main/resources/application.conf` f
 > datastax-java-driver.advanced.speculative-execution-policy.max-executions
 > = 3 datastax-java-driver.advanced.speculative-execution-policy.delay = 10
 
-please note the test cluster does not have authention or SSL set up - please add relevant configurations if using them. refer to [documentation](https://docs.datastax.com/en/developer/java-driver/4.9/manual/core/configuration/reference/).
+please note the test cluster does not have authentication or SSL set up - please add relevant configurations if using them. refer to [documentation](https://docs.datastax.com/en/developer/java-driver/4.9/manual/core/configuration/reference/).
 
 ## steps for running the test
 
 run the main method in  `com.datastax.custom_lbp.customlbp.test.TestCustomLBP` class
-after the code is running it will print the ip of the coordinator it is contacting in the system console
+after the code is running, it will print the ip of the coordinator it is contacting in the system console
 
  
               found row : <some value>
               coordinator node : <ip>
               coordinator node DC : DC1
 
-shutdown two nodes your local datacenter
-the code, once the driver has realised that the local datacenter is down, will start sedning requests to the remote datcenter
+shutdown two nodes your local datacenter DC1
+the code, once the driver has realised that the local datacenter is down, will start sending requests to the remote datcenter DC2
 
      found row : <some value>
      coordinator node : <ip>
      coordinator node DC : DC2
-bring up the two nodes your local datacenter
-the code, once the driver has realised that the local datacenter is ip , will start sedning requests to the local datcenter again
+bring up the two nodes your local datacenter DC1
+the code, once the driver has realised that the local datacenter is up , will start sending requests to the local datcenter DC1 again.
 
      found row : <some value>
      coordinator node : <ip>
