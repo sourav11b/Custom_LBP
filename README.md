@@ -1,6 +1,6 @@
 # Instructions
 
-this is an example Java repo on demonstatring how to use a custom load balancer with your datastax java driver version 4.9
+this is an example Java repo on demonstatring how to use a custom load balancer with Datastax java driver version 4.9
 
 
 # setup
