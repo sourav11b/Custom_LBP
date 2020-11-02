@@ -12,15 +12,14 @@ import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 
-public class test {
+public class TestCustomLBP {
 
-	public test() {
+	public TestCustomLBP() {
 		// TODO Auto-generated constructor stub
 	}
 
 	public static void main(String[] args) {
-		try (CqlSession session = CqlSession.builder().addContactPoint(new InetSocketAddress("54.67.24.25", 9042))
-				.addContactPoint(new InetSocketAddress("50.18.97.114", 9042)).withLocalDatacenter("DC1").build()) {
+		try (CqlSession session = CqlSession.builder().build()) {
 
 			PreparedStatement prepared = session.prepare("select * from cycling.cyclist_semi_pro  where id = ?");
 			while (true) {

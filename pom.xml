@@ -19,12 +19,7 @@
             <artifactId>logback-classic</artifactId>
             <version>1.2.3</version>
         </dependency>
-
-    <dependency>
-  <groupId>com.datastax.oss</groupId>
-  <artifactId>java-driver-query-builder</artifactId>
-  <version>4.7.2</version>
-</dependency>    
+ 
 </dependencies>
 
     <build>
