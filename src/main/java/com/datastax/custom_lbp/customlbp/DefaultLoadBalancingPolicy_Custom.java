@@ -123,13 +123,8 @@ public class DefaultLoadBalancingPolicy_Custom extends BasicLoadBalancingPolicy_
 
 	@Override
 	public void init(@NonNull Map<UUID, Node> nodes, @NonNull DistanceReporter distanceReporter) {
-//	 for (Iterator iterator = nodes.keySet().iterator(); iterator.hasNext();) {
-//		 UUID uuid = (UUID) iterator.next();
-//		 LOG.debug("----"+uuid);
-//		Node node = nodes.get(uuid);
-//		LOG.debug("----"+node.getListenAddress().toString());
-//		
-//	}
+
+		LOG.warn("------------LOADED CUSTOM LOAD BAANCING CLASS------------");
 		super.init(nodes, distanceReporter);
 
 		if (avoidSlowReplicas) {
@@ -155,13 +150,6 @@ public class DefaultLoadBalancingPolicy_Custom extends BasicLoadBalancingPolicy_
 		Object[] currentNodes = liveNodes.toArray();
 
 		Object[] currentNodes_copy = liveNodes.toArray();
-
-//		for (int i = 0; i < currentNodes.length; i++) {
-//
-//			Node node = (Node) currentNodes[i];
-//			LOG.trace(node.getEndPoint().toString());
-//
-//		}
 
 		Set<Node> allReplicas = getReplicas(request, session);
 
