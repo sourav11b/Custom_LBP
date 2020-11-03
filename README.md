@@ -40,7 +40,7 @@ after the code is running, it will print the ip of the coordinator it is contact
               coordinator node DC : DC1
 
 shutdown two nodes your local datacenter DC1
-the code, once the driver has realised that the local datacenter is down, will start sending requests to the remote datcenter DC2
+the code, once the driver has realised that the local datacenter is down( that is, the local datacenter **does not have** two replicas available for statisfying LOCAL_QOURUM requests ), will start sending requests to the remote datcenter DC2
 
      found row : <some value>
      coordinator node : <ip>
