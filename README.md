@@ -2,7 +2,7 @@
 
 this is an example Java repo on demonstatring how to use a custom load balancer with Datastax java driver version 4.9
 
-**Please not this is locally tested only for prepared statements on a single table- this is, by no means, a production ready code.**
+**Please note that this is dev tested only for prepared statements on a single table- this is, by no means, a production ready code.**
 
 
 # setup
